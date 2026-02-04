@@ -2,10 +2,12 @@ const puppeteer = require('puppeteer');
 const Event = require('../models/Event');
 
 async function scrapeTimeoutSydney() {
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
+ const browser = await puppeteer.launch({
+  args: chromium.args,
+  defaultViewport: chromium.defaultViewport,
+  executablePath: await chromium.executablePath || '/usr/bin/chromium-browser',
+  headless: chromium.headless,
+});
   
   try {
     const page = await browser.newPage();
