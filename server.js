@@ -46,7 +46,13 @@ app.use((err, req, res, next) => {
 });
 
 // Start scraper scheduler
-startScheduler();
+// startScheduler();
+// Only run scrapers in development
+if (process.env.NODE_ENV !== 'production') {
+  startScheduler();
+} else {
+  console.log('Scraping disabled in production. Run locally to populate database.');
+}
 
 // Start server
 const PORT = process.env.PORT || 5000;
