@@ -31,6 +31,22 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/events', require('./routes/eventRoutes'));
 
 // Health check
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Sydney Events API - Backend Server',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      events: '/api/events',
+      auth: '/api/auth/google',
+      documentation: 'See README for full API documentation'
+    }
+  });
+});
+
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
