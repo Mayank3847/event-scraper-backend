@@ -1,5 +1,7 @@
 const Event = require('../models/Event');
 const EmailCapture = require('../models/EmailCapture');
+const OTP = require('../models/OTP');
+const { generateOTP, sendOTPEmail } = require('../utils/emailService');
 
 // Get all events (public)
 exports.getAllEvents = async (req, res) => {
@@ -73,7 +75,7 @@ exports.getEvent = async (req, res) => {
   }
 };
 
-// Capture email for event (public)
+// Capture email for event + Send OTP (public)
 exports.captureEmail = async (req, res) => {
   try {
     const { email, consent, eventId } = req.body;
@@ -93,7 +95,30 @@ exports.captureEmail = async (req, res) => {
         message: 'Event not found'
       });
     }
-    
+
+    // Generate OTP
+    const otp = generateOTP();
+
+    // Save OTP to database
+    const otpRecord = await OTP.create({
+      email,
+      otp,
+      eventId,
+      eventTitle: event.title,
+      eventUrl: event.originalUrl
+    });
+
+    // Send OTP email to user's email
+    const emailResult = await sendOTPEmail(email, otp, event.title);
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send OTP email. Please try again.'
+      });
+    }
+
+    // Save email capture
     await EmailCapture.create({
       email,
       consent,
@@ -103,14 +128,120 @@ exports.captureEmail = async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Email captured successfully',
-      redirectUrl: event.originalUrl
+      message: 'OTP sent to your email',
+      otpId: otpRecord._id,
+      email: email
     });
   } catch (error) {
+    console.error('Error capturing email:', error);
     res.status(500).json({
       success: false,
       message: 'Error capturing email',
       error: error.message
+    });
+  }
+};
+
+// Verify OTP (public)
+exports.verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and OTP are required'
+      });
+    }
+
+    // Find OTP record
+    const otpRecord = await OTP.findOne({
+      email,
+      otp,
+      verified: false,
+      expiresAt: { $gt: new Date() }
+    }).sort({ createdAt: -1 });
+
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP'
+      });
+    }
+
+    // Mark as verified
+    otpRecord.verified = true;
+    await otpRecord.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully',
+      eventUrl: otpRecord.eventUrl
+    });
+
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
+// Resend OTP (public)
+exports.resendOTP = async (req, res) => {
+  try {
+    const { email, eventId } = req.body;
+
+    if (!email || !eventId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and eventId are required'
+      });
+    }
+
+    // Get event details
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    // Generate new OTP
+    const otp = generateOTP();
+
+    // Save new OTP
+    await OTP.create({
+      email,
+      otp,
+      eventId,
+      eventTitle: event.title,
+      eventUrl: event.originalUrl
+    });
+
+    // Send OTP email
+    const emailResult = await sendOTPEmail(email, otp, event.title);
+
+    if (!emailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send OTP email'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'New OTP sent to your email'
+    });
+
+  } catch (error) {
+    console.error('Error resending OTP:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
     });
   }
 };
