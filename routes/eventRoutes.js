@@ -1,26 +1,20 @@
 const express = require('express');
-const {
-  getAllEvents,
-  getEvent,
-  captureEmail,
-  importEvent,
-  updateEventStatus,
-  getDashboardStats
-} = require('../controllers/eventController');
+const router = express.Router();
+const eventController = require('../controllers/eventController');
 const { protect } = require('../middleware/authMiddleware');
 
-const router = express.Router();
-
 // Public routes
-router.get('/', getAllEvents);
-router.get('/:id', getEvent);
-router.post('/capture-email', captureEmail);
-// Add to existing routes
+router.get('/', eventController.getAllEvents);
+router.get('/:id', eventController.getEvent);
+router.post('/capture-email', eventController.captureEmail);
+
+// New OTP routes (public)
 router.post('/verify-otp', eventController.verifyOTP);
 router.post('/resend-otp', eventController.resendOTP);
-// Admin routes (protected)
-router.post('/:id/import', protect, importEvent);
-router.patch('/:id/status', protect, updateEventStatus);
-router.get('/admin/stats', protect, getDashboardStats);
+
+// Protected admin routes
+router.post('/:id/import', protect, eventController.importEvent);
+router.patch('/:id/status', protect, eventController.updateEventStatus);
+router.get('/admin/stats', protect, eventController.getDashboardStats);
 
 module.exports = router;
